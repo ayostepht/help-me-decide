@@ -42,13 +42,21 @@ export const useGeminiAPI = () => {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      const data: GeminiAPIResponse = await response.json();
+      const data = await response.json();
       
-      if (!data.candidates || data.candidates.length === 0) {
+      // Check for API error response
+      if (data.error) {
+        throw new Error(`Gemini API Error: ${data.error.message}`);
+      }
+      
+      // Type assertion after error check
+      const geminiResponse = data as GeminiAPIResponse;
+      
+      if (!geminiResponse.candidates || geminiResponse.candidates.length === 0) {
         throw new Error('No response generated from Gemini API');
       }
 
-      const content = data.candidates[0].content.parts[0].text;
+      const content = geminiResponse.candidates[0].content.parts[0].text;
       return content;
     } catch (error) {
       console.error('Gemini API Error:', error);
