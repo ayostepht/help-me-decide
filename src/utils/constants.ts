@@ -38,5 +38,5 @@ export const GEMINI_CONFIG = {
   temperature: 0.7,
   topK: 40,
   topP: 0.9,
-  maxOutputTokens: 1024
+  maxOutputTokens: 2048
 } as const;

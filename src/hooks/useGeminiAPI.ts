@@ -56,7 +56,15 @@ export const useGeminiAPI = () => {
         throw new Error('No response generated from Gemini API');
       }
 
-      const content = geminiResponse.candidates[0].content.parts[0].text;
+      const candidate = geminiResponse.candidates[0];
+      if (!candidate?.content?.parts || candidate.content.parts.length === 0) {
+        throw new Error('Invalid response structure from Gemini API');
+      }
+
+      const content = candidate.content.parts[0]?.text;
+      if (!content) {
+        throw new Error('No text content in Gemini API response');
+      }
       return content;
     } catch (error) {
       console.error('Gemini API Error:', error);
@@ -81,9 +89,23 @@ export const useGeminiAPI = () => {
     const content = await generateContent(prompt);
     try {
       const cleanedContent = cleanJSONResponse(content);
+      
+      // Check if the cleaned content looks like valid JSON before parsing
+      if (!cleanedContent.trim().startsWith('{') && !cleanedContent.trim().startsWith('[')) {
+        throw new Error('Response does not appear to be JSON format');
+      }
+      
       return JSON.parse(cleanedContent) as T;
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError, 'Original Content:', content);
+      console.error('JSON Parse Error:', parseError);
+      console.error('Original Content:', content);
+      console.error('Cleaned Content:', cleanJSONResponse(content));
+      
+      // If JSON is truncated, try to request a new response
+      if (parseError instanceof SyntaxError && parseError.message.includes('Unterminated')) {
+        throw new Error('Received incomplete JSON response from Gemini API. Please try again.');
+      }
+      
       throw new Error('Failed to parse JSON response from Gemini API');
     }
   }, [generateContent]);
