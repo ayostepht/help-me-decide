@@ -33,10 +33,27 @@ export const CRISIS_RESOURCES = [
   }
 ] as const;
 
-// API Configuration
-export const GEMINI_CONFIG = {
+// API Configuration - Fast responses for conversations
+export const GEMINI_CONFIG_FAST = {
   temperature: 0.7,
   topK: 40,
   topP: 0.9,
-  maxOutputTokens: 2048
+  maxOutputTokens: 2048,
+  thinkingConfig: {
+    thinkingBudget: 0
+  }
 } as const;
+
+// API Configuration - Thinking enabled for verdicts
+export const GEMINI_CONFIG_THINKING = {
+  temperature: 0.7,
+  topK: 40,
+  topP: 0.9,
+  maxOutputTokens: 2048,
+  thinkingConfig: {
+    thinkingBudget: -1
+  }
+} as const;
+
+// Default config for backward compatibility
+export const GEMINI_CONFIG = GEMINI_CONFIG_FAST;

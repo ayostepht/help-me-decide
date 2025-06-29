@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
 import { GeminiAPIRequest, GeminiAPIResponse, AIResponse, SafetyCheckResponse } from '../types';
-import { GEMINI_CONFIG } from '../utils/constants';
+import { GEMINI_CONFIG, GEMINI_CONFIG_FAST, GEMINI_CONFIG_THINKING } from '../utils/constants';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 export const useGeminiAPI = () => {
-  const generateContent = useCallback(async (prompt: string): Promise<string> => {
+  const generateContent = useCallback(async (prompt: string, config = GEMINI_CONFIG): Promise<string> => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('Gemini API key not found. Please set VITE_GEMINI_API_KEY in your environment variables.');
@@ -18,7 +18,7 @@ export const useGeminiAPI = () => {
           parts: [{ text: prompt }]
         }
       ],
-      generationConfig: GEMINI_CONFIG
+      generationConfig: config
     };
 
     try {
@@ -85,8 +85,8 @@ export const useGeminiAPI = () => {
     return cleaned.trim();
   };
 
-  const generateJSONResponse = useCallback(async <T>(prompt: string): Promise<T> => {
-    const content = await generateContent(prompt);
+  const generateJSONResponse = useCallback(async <T>(prompt: string, config = GEMINI_CONFIG): Promise<T> => {
+    const content = await generateContent(prompt, config);
     try {
       const cleanedContent = cleanJSONResponse(content);
       
@@ -101,21 +101,30 @@ export const useGeminiAPI = () => {
       console.error('Original Content:', content);
       console.error('Cleaned Content:', cleanJSONResponse(content));
       
-      // If JSON is truncated, try to request a new response
-      if (parseError instanceof SyntaxError && parseError.message.includes('Unterminated')) {
-        throw new Error('Received incomplete JSON response from Gemini API. Please try again.');
+      // If JSON is truncated or has parsing issues, request again with stricter prompt
+      if (parseError instanceof SyntaxError) {
+        console.warn('JSON parsing failed, trying with stricter prompt...');
+        const stricterPrompt = prompt + '\n\nIMPORTANT: Ensure all quotes and apostrophes in your response text are properly escaped for valid JSON. Use \\" for quotes within strings.';
+        
+        try {
+          const retryContent = await generateContent(stricterPrompt, config);
+          const retryCleanedContent = cleanJSONResponse(retryContent);
+          return JSON.parse(retryCleanedContent) as T;
+        } catch (retryError) {
+          console.error('Retry also failed:', retryError);
+        }
       }
       
       throw new Error('Failed to parse JSON response from Gemini API');
     }
   }, [generateContent]);
 
-  const generateAIResponse = useCallback(async (prompt: string): Promise<AIResponse> => {
-    return generateJSONResponse<AIResponse>(prompt);
+  const generateAIResponse = useCallback(async (prompt: string, config = GEMINI_CONFIG): Promise<AIResponse> => {
+    return generateJSONResponse<AIResponse>(prompt, config);
   }, [generateJSONResponse]);
 
-  const generateSafetyCheck = useCallback(async (prompt: string): Promise<SafetyCheckResponse> => {
-    return generateJSONResponse<SafetyCheckResponse>(prompt);
+  const generateSafetyCheck = useCallback(async (prompt: string, config = GEMINI_CONFIG): Promise<SafetyCheckResponse> => {
+    return generateJSONResponse<SafetyCheckResponse>(prompt, config);
   }, [generateJSONResponse]);
 
   return {

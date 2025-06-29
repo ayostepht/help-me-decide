@@ -3,6 +3,7 @@ import { Message, VerdictData, ConversationStep } from '../types';
 import { useGeminiAPI } from './useGeminiAPI';
 import { createInitialPrompt, createConversationPrompt, createVerdictPrompt } from '../utils/prompts';
 import { getFallbackResponse, getFallbackVerdict } from '../utils/safety';
+import { GEMINI_CONFIG_FAST, GEMINI_CONFIG_THINKING } from '../utils/constants';
 
 export const useConversation = () => {
   const [currentStep, setCurrentStep] = useState<ConversationStep>('initial');
@@ -27,7 +28,7 @@ export const useConversation = () => {
     
     try {
       const initialPrompt = createInitialPrompt(userSituation, currentMood);
-      const aiMessage = await generateAIResponse(initialPrompt);
+      const aiMessage = await generateAIResponse(initialPrompt, GEMINI_CONFIG_FAST);
       
       const newConversation: Message[] = [
         { role: 'user', content: `I'm trying to decide: ${userSituation}` },
@@ -67,7 +68,7 @@ export const useConversation = () => {
     
     try {
       const prompt = createConversationPrompt(updatedConversation);
-      const aiMessage = await generateAIResponse(prompt);
+      const aiMessage = await generateAIResponse(prompt, GEMINI_CONFIG_FAST);
       
       const finalConversation: Message[] = [
         ...updatedConversation,
@@ -96,7 +97,7 @@ export const useConversation = () => {
     
     try {
       const verdictPrompt = createVerdictPrompt(conversation, currentMood);
-      const verdictData = await generateJSONResponse<VerdictData>(verdictPrompt);
+      const verdictData = await generateJSONResponse<VerdictData>(verdictPrompt, GEMINI_CONFIG_THINKING);
       
       setVerdict(verdictData);
     } catch (error) {
