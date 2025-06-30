@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageCircle, RotateCcw, Send, User, Bot, Brain } from 'lucide-react';
 import { Message } from '../types';
 import { Button } from './shared/Button';
+import { ErrorDisplay } from './shared/ErrorDisplay';
 
 interface ConversationInterfaceProps {
   conversation: Message[];
@@ -13,6 +14,14 @@ interface ConversationInterfaceProps {
   onKeyPress: (e: React.KeyboardEvent) => void;
   isLoading: boolean;
   showVerdictModal: boolean;
+  errorInfo?: {
+    message: string;
+    type: string;
+    canRetry: boolean;
+    isRetrying: boolean;
+  } | null;
+  onRetryMessage?: () => void;
+  onClearError?: () => void;
 }
 
 export const ConversationInterface: React.FC<ConversationInterfaceProps> = ({
@@ -24,7 +33,10 @@ export const ConversationInterface: React.FC<ConversationInterfaceProps> = ({
   onReset,
   onKeyPress,
   isLoading,
-  showVerdictModal
+  showVerdictModal,
+  errorInfo,
+  onRetryMessage,
+  onClearError
 }) => {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen p-6">
@@ -78,13 +90,32 @@ export const ConversationInterface: React.FC<ConversationInterfaceProps> = ({
               </div>
               <div className="bg-gray-100 text-gray-800 p-4 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                  <div 
+                    className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"
+                    role="status"
+                    aria-label="AI is thinking"
+                  ></div>
                   <span>Thinking...</span>
                 </div>
               </div>
             </div>
           )}
         </div>
+
+        {/* Error Display */}
+        {errorInfo && (
+          <div className="px-6 py-2">
+            <ErrorDisplay
+              message={errorInfo.message}
+              type={errorInfo.type as any}
+              canRetry={errorInfo.canRetry}
+              isRetrying={errorInfo.isRetrying}
+              onRetry={onRetryMessage}
+              onDismiss={onClearError}
+              compact
+            />
+          </div>
+        )}
 
         {/* Input Area */}
         <div className="p-6 border-t border-gray-200">
@@ -105,8 +136,8 @@ export const ConversationInterface: React.FC<ConversationInterfaceProps> = ({
             </button>
           </div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-gray-500">Press Enter to send, Shift+Enter for new line</p>
-            <p className="text-xs text-gray-400">🔒 Not stored</p>
+            <p className="text-xs text-gray-600">Press Enter to send, Shift+Enter for new line</p>
+            <p className="text-xs text-gray-600">🔒 Not stored</p>
           </div>
           {conversation.length > 0 && !showVerdictModal && (
             <Button

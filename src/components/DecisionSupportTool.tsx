@@ -1,10 +1,14 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, lazy, Suspense } from 'react';
 import { InitialAssessment } from './InitialAssessment';
 import { ConversationInterface } from './ConversationInterface';
-import { VerdictModal } from './VerdictModal';
-import { SafetyMode } from './SafetyMode';
+import { ErrorDisplay } from './shared/ErrorDisplay';
 import { useConversation } from '../hooks/useConversation';
 import { useSafetyCheck } from '../hooks/useSafetyCheck';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+
+// Lazy load components that are not immediately needed
+const VerdictModal = lazy(() => import('./VerdictModal').then(module => ({ default: module.VerdictModal })));
+const SafetyMode = lazy(() => import('./SafetyMode').then(module => ({ default: module.SafetyMode })));
 
 export const DecisionSupportTool: React.FC = () => {
   const {
@@ -34,47 +38,46 @@ export const DecisionSupportTool: React.FC = () => {
     resetSafetyMode
   } = useSafetyCheck();
 
+  const {
+    clearError,
+    executeWithErrorHandling,
+    retry,
+    getErrorInfo
+  } = useErrorHandler();
+
   const handleInitialSubmit = useCallback(async () => {
     if (!userSituation.trim()) return;
     
-    // Set loading immediately for instant feedback
+    clearError();
     setIsLoading(true);
     
-    try {
+    await executeWithErrorHandling(async () => {
       const hasSafetyTrigger = await checkForSafetyTriggers(userSituation);
       if (!hasSafetyTrigger) {
         await startConversation();
-      } else {
-        // If safety triggered, reset loading since we won't proceed
-        setIsLoading(false);
       }
-    } catch (error) {
-      // Reset loading on error
-      setIsLoading(false);
-      console.error('Error in initial submit:', error);
-    }
-  }, [userSituation, checkForSafetyTriggers, startConversation, setIsLoading]);
+      return hasSafetyTrigger;
+    }, 'initial submission');
+    
+    setIsLoading(false);
+  }, [userSituation, checkForSafetyTriggers, startConversation, setIsLoading, clearError, executeWithErrorHandling]);
 
   const handleSendMessage = useCallback(async () => {
     if (!currentInput.trim() || isLoading) return;
     
-    // Set loading immediately for instant feedback
+    clearError();
     setIsLoading(true);
     
-    try {
+    await executeWithErrorHandling(async () => {
       const hasSafetyTrigger = await checkForSafetyTriggers(currentInput);
       if (!hasSafetyTrigger) {
         await sendMessage();
-      } else {
-        // If safety triggered, reset loading since we won't proceed
-        setIsLoading(false);
       }
-    } catch (error) {
-      // Reset loading on error
-      setIsLoading(false);
-      console.error('Error in send message:', error);
-    }
-  }, [currentInput, isLoading, checkForSafetyTriggers, sendMessage, setIsLoading]);
+      return hasSafetyTrigger;
+    }, 'sending message');
+    
+    setIsLoading(false);
+  }, [currentInput, isLoading, checkForSafetyTriggers, sendMessage, setIsLoading, clearError, executeWithErrorHandling]);
 
   const handleDecideButton = useCallback(() => {
     if (safetyMode) return;
@@ -85,7 +88,28 @@ export const DecisionSupportTool: React.FC = () => {
   const handleReset = useCallback(() => {
     reset();
     resetSafetyMode();
-  }, [reset, resetSafetyMode]);
+    clearError();
+  }, [reset, resetSafetyMode, clearError]);
+
+  const handleRetryInitialSubmit = useCallback(async () => {
+    await retry(async () => {
+      const hasSafetyTrigger = await checkForSafetyTriggers(userSituation);
+      if (!hasSafetyTrigger) {
+        await startConversation();
+      }
+      return hasSafetyTrigger;
+    }, 'initial submission retry');
+  }, [retry, checkForSafetyTriggers, userSituation, startConversation]);
+
+  const handleRetrySendMessage = useCallback(async () => {
+    await retry(async () => {
+      const hasSafetyTrigger = await checkForSafetyTriggers(currentInput);
+      if (!hasSafetyTrigger) {
+        await sendMessage();
+      }
+      return hasSafetyTrigger;
+    }, 'send message retry');
+  }, [retry, checkForSafetyTriggers, currentInput, sendMessage]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -100,20 +124,39 @@ export const DecisionSupportTool: React.FC = () => {
 
   // Initial Assessment Screen
   if (currentStep === 'initial') {
+    const errorInfo = getErrorInfo();
+    
     return (
-      <InitialAssessment
-        userSituation={userSituation}
-        setUserSituation={setUserSituation}
-        currentMood={currentMood}
-        setCurrentMood={setCurrentMood}
-        onSubmit={handleInitialSubmit}
-        isLoading={isLoading}
-        onKeyPress={handleKeyPress}
-      />
+      <div className="space-y-4">
+        <InitialAssessment
+          userSituation={userSituation}
+          setUserSituation={setUserSituation}
+          currentMood={currentMood}
+          setCurrentMood={setCurrentMood}
+          onSubmit={handleInitialSubmit}
+          isLoading={isLoading}
+          onKeyPress={handleKeyPress}
+        />
+        {errorInfo && (
+          <div className="max-w-4xl mx-auto px-6">
+            <ErrorDisplay
+              message={errorInfo.message}
+              type={errorInfo.type}
+              canRetry={errorInfo.canRetry}
+              isRetrying={errorInfo.isRetrying}
+              onRetry={handleRetryInitialSubmit}
+              onDismiss={clearError}
+              compact
+            />
+          </div>
+        )}
+      </div>
     );
   }
 
   // Conversation Screen
+  const errorInfo = getErrorInfo();
+  
   return (
     <>
       <ConversationInterface
@@ -126,29 +169,36 @@ export const DecisionSupportTool: React.FC = () => {
         onKeyPress={handleKeyPress}
         isLoading={isLoading}
         showVerdictModal={showVerdictModal}
+        errorInfo={errorInfo}
+        onRetryMessage={handleRetrySendMessage}
+        onClearError={clearError}
       />
 
       {/* Safety Mode Overlay */}
       {safetyMode && (
         <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-purple-50 p-6 z-50">
           <div className="bg-white rounded-xl shadow-lg h-[calc(100vh-3rem)] flex flex-col max-w-4xl mx-auto">
-            <SafetyMode
-              safetyResources={safetyResources}
-              onReset={handleReset}
-            />
+            <Suspense fallback={<div className="flex items-center justify-center h-full">Loading...</div>}>
+              <SafetyMode
+                safetyResources={safetyResources}
+                onReset={handleReset}
+              />
+            </Suspense>
           </div>
         </div>
       )}
 
       {/* Verdict Modal */}
-      <VerdictModal
-        isOpen={showVerdictModal}
-        verdict={verdict}
-        isLoading={isLoading}
-        onClose={() => setShowVerdictModal(false)}
-        onContinue={() => setShowVerdictModal(false)}
-        onReset={handleReset}
-      />
+      <Suspense fallback={null}>
+        <VerdictModal
+          isOpen={showVerdictModal}
+          verdict={verdict}
+          isLoading={isLoading}
+          onClose={() => setShowVerdictModal(false)}
+          onContinue={() => setShowVerdictModal(false)}
+          onReset={handleReset}
+        />
+      </Suspense>
     </>
   );
 };

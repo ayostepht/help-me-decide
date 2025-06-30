@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
-import { GeminiAPIRequest, GeminiAPIResponse, AIResponse, SafetyCheckResponse } from '../types';
-import { GEMINI_CONFIG, GEMINI_CONFIG_FAST, GEMINI_CONFIG_THINKING } from '../utils/constants';
+import { GeminiAPIRequest, GeminiAPIResponse, AIResponse, SafetyCheckResponse, GenerationConfig } from '../types';
+import { GEMINI_CONFIG } from '../utils/constants';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 export const useGeminiAPI = () => {
-  const generateContent = useCallback(async (prompt: string, config = GEMINI_CONFIG): Promise<string> => {
+  const generateContent = useCallback(async (prompt: string, config: GenerationConfig = GEMINI_CONFIG): Promise<string> => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('Gemini API key not found. Please set VITE_GEMINI_API_KEY in your environment variables.');
@@ -67,6 +67,29 @@ export const useGeminiAPI = () => {
       }
       return content;
     } catch (error) {
+      // Add more context to the error for better categorization
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out after 30 seconds. Please try again.');
+        }
+        
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error('Network connection failed. Please check your internet connection.');
+        }
+        
+        if (error.message.includes('HTTP 429')) {
+          throw new Error('Too many requests. Please wait a moment and try again.');
+        }
+        
+        if (error.message.includes('HTTP 403')) {
+          throw new Error('API access denied. Please check your API key configuration.');
+        }
+        
+        if (error.message.includes('HTTP 500') || error.message.includes('HTTP 502') || error.message.includes('HTTP 503')) {
+          throw new Error('AI service is temporarily unavailable. Please try again.');
+        }
+      }
+      
       console.error('Gemini API Error:', error);
       throw error;
     }
@@ -85,7 +108,7 @@ export const useGeminiAPI = () => {
     return cleaned.trim();
   };
 
-  const generateJSONResponse = useCallback(async <T>(prompt: string, config = GEMINI_CONFIG): Promise<T> => {
+  const generateJSONResponse = useCallback(async <T>(prompt: string, config: GenerationConfig = GEMINI_CONFIG): Promise<T> => {
     const content = await generateContent(prompt, config);
     try {
       const cleanedContent = cleanJSONResponse(content);
@@ -119,11 +142,11 @@ export const useGeminiAPI = () => {
     }
   }, [generateContent]);
 
-  const generateAIResponse = useCallback(async (prompt: string, config = GEMINI_CONFIG): Promise<AIResponse> => {
+  const generateAIResponse = useCallback(async (prompt: string, config: GenerationConfig = GEMINI_CONFIG): Promise<AIResponse> => {
     return generateJSONResponse<AIResponse>(prompt, config);
   }, [generateJSONResponse]);
 
-  const generateSafetyCheck = useCallback(async (prompt: string, config = GEMINI_CONFIG): Promise<SafetyCheckResponse> => {
+  const generateSafetyCheck = useCallback(async (prompt: string, config: GenerationConfig = GEMINI_CONFIG): Promise<SafetyCheckResponse> => {
     return generateJSONResponse<SafetyCheckResponse>(prompt, config);
   }, [generateJSONResponse]);
 

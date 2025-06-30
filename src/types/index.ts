@@ -48,6 +48,16 @@ export interface AppState {
 }
 
 // Gemini API Types
+export interface GenerationConfig {
+  temperature?: number;
+  topK?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  thinkingConfig?: {
+    thinkingBudget: number;
+  };
+}
+
 export interface GeminiAPIRequest {
   contents: {
     role: 'user';
@@ -55,12 +65,7 @@ export interface GeminiAPIRequest {
       text: string;
     }[];
   }[];
-  generationConfig?: {
-    temperature?: number;
-    topK?: number;
-    topP?: number;
-    maxOutputTokens?: number;
-  };
+  generationConfig?: GenerationConfig;
 }
 
 export interface GeminiAPIResponse {
@@ -89,4 +94,30 @@ export interface AIResponse {
 export interface APIError {
   message: string;
   status?: number;
+}
+
+// Enhanced Error Handling Types
+export type ErrorType = 'network' | 'timeout' | 'api' | 'parse' | 'validation' | 'unknown';
+
+export interface AppError {
+  type: ErrorType;
+  message: string;
+  userMessage: string;
+  recoverable: boolean;
+  retryable: boolean;
+  timestamp: Date;
+  details?: any;
+}
+
+export interface ErrorState {
+  hasError: boolean;
+  error: AppError | null;
+  retryCount: number;
+  isRetrying: boolean;
+}
+
+export interface RetryConfig {
+  maxAttempts: number;
+  delayMs: number;
+  backoffMultiplier: number;
 }

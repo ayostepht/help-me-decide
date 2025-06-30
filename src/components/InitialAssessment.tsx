@@ -25,9 +25,12 @@ export const InitialAssessment: React.FC<InitialAssessmentProps> = ({
 }) => {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen flex items-center justify-center p-6">
-      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-3xl">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
+      <main className="bg-white rounded-xl shadow-lg p-8 w-full max-w-3xl">
+        <header className="text-center mb-8">
+          <div 
+            className="flex items-center justify-center gap-3 mb-4"
+            aria-hidden="true"
+          >
             <Brain className="w-10 h-10 text-blue-600" />
             <Heart className="w-10 h-10 text-purple-600" />
           </div>
@@ -35,62 +38,84 @@ export const InitialAssessment: React.FC<InitialAssessmentProps> = ({
           <p className="text-gray-600 text-lg">
             A gentle space to work through decisions when things feel overwhelming
           </p>
-        </div>
+        </header>
 
-        <div className="space-y-6">
+        <form 
+          className="space-y-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+          noValidate
+        >
           <Input
             label="What decision are you trying to make?"
+            description="Describe the situation you're facing. It could be about work, social plans, personal tasks, self-care, or anything else you're uncertain about."
             value={userSituation}
             onChange={(e) => setUserSituation(e.target.value)}
             onKeyPress={onKeyPress}
-            placeholder="Describe the situation you're facing. It could be about work, social plans, personal tasks, self-care, or anything else you're uncertain about..."
+            placeholder="Share what's on your mind..."
             className="h-32"
+            required
+            aria-required="true"
           />
 
-          <div>
-            <label className="block text-lg font-medium text-gray-700 mb-3">
+          <fieldset className="space-y-3">
+            <legend className="block text-lg font-medium text-gray-700">
               How are you feeling today?
-            </label>
+            </legend>
             <Slider value={currentMood} onChange={setCurrentMood} />
-          </div>
+          </fieldset>
 
           <Button
-            onClick={onSubmit}
+            type="submit"
             disabled={!userSituation.trim() || isLoading}
             fullWidth
             size="lg"
+            loading={isLoading}
+            aria-describedby={!userSituation.trim() ? 'submit-help' : undefined}
           >
             {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <>
+                <span className="sr-only">Processing your request</span>
+                Starting conversation...
+              </>
             ) : (
               <>
                 Start Conversation
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5" aria-hidden="true" />
               </>
             )}
           </Button>
-        </div>
+          
+          {!userSituation.trim() && (
+            <p id="submit-help" className="text-sm text-gray-600 text-center">
+              Please describe your situation to continue
+            </p>
+          )}
+        </form>
 
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg">
+        <aside className="mt-8 p-4 bg-blue-50 rounded-lg" role="complementary">
           <div className="flex items-start gap-3">
-            <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+            <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" aria-hidden="true" />
             <div>
-              <h3 className="font-medium text-blue-800 mb-1">How this works</h3>
+              <h2 className="font-medium text-blue-800 mb-1">How this works</h2>
               <p className="text-blue-700 text-sm">
                 I'll help you explore your situation through gentle questions, understand your feelings, 
                 and work together to find a decision that feels right for you and your current capacity.
               </p>
             </div>
           </div>
-        </div>
+        </aside>
 
-        {/* Privacy Notice */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-400">
-            🔒 Your conversations are private and not saved or stored anywhere
+        <footer className="mt-6 text-center">
+          <p className="text-xs text-gray-600">
+            <span aria-hidden="true">🔒</span>
+            <span className="sr-only">Privacy notice:</span>
+            Your conversations are private and not saved or stored anywhere
           </p>
-        </div>
-      </div>
+        </footer>
+      </main>
     </div>
   );
 };

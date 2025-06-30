@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { Message, VerdictData, ConversationStep } from '../types';
 import { useGeminiAPI } from './useGeminiAPI';
 import { createInitialPrompt, createConversationPrompt, createVerdictPrompt } from '../utils/prompts';
@@ -20,6 +20,12 @@ export const useConversation = () => {
 
   const { generateAIResponse, generateJSONResponse } = useGeminiAPI();
 
+  // Memoize prompt creation to avoid unnecessary recalculations
+  const memoizedPrompts = useMemo(() => ({
+    initial: userSituation ? createInitialPrompt(userSituation, currentMood) : '',
+    verdict: conversation.length > 0 ? createVerdictPrompt(conversation, currentMood) : ''
+  }), [userSituation, currentMood, conversation]);
+
   const startConversation = useCallback(async (): Promise<void> => {
     if (!userSituation.trim()) return;
     
@@ -27,8 +33,7 @@ export const useConversation = () => {
     setCurrentStep('conversation');
     
     try {
-      const initialPrompt = createInitialPrompt(userSituation, currentMood);
-      const aiMessage = await generateAIResponse(initialPrompt, GEMINI_CONFIG_FAST);
+      const aiMessage = await generateAIResponse(memoizedPrompts.initial, GEMINI_CONFIG_FAST);
       
       const newConversation: Message[] = [
         { role: 'user', content: `I'm trying to decide: ${userSituation}` },
@@ -49,7 +54,7 @@ export const useConversation = () => {
     }
     
     setIsLoading(false);
-  }, [userSituation, currentMood, generateAIResponse]);
+  }, [userSituation, generateAIResponse, memoizedPrompts.initial]);
 
   const sendMessage = useCallback(async (): Promise<void> => {
     if (!currentInput.trim() || isLoading || isProcessingRef.current) return;
@@ -96,8 +101,7 @@ export const useConversation = () => {
     setIsLoading(true);
     
     try {
-      const verdictPrompt = createVerdictPrompt(conversation, currentMood);
-      const verdictData = await generateJSONResponse<VerdictData>(verdictPrompt, GEMINI_CONFIG_THINKING);
+      const verdictData = await generateJSONResponse<VerdictData>(memoizedPrompts.verdict, GEMINI_CONFIG_THINKING);
       
       setVerdict(verdictData);
     } catch (error) {
@@ -107,7 +111,7 @@ export const useConversation = () => {
     }
     
     setIsLoading(false);
-  }, [conversation, currentMood, generateJSONResponse]);
+  }, [generateJSONResponse, memoizedPrompts.verdict]);
 
   const reset = useCallback(() => {
     isProcessingRef.current = false;
